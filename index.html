@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<title>TourPlan AI — Automated Tour Plan Generator</title>
+<meta name="description" content="Upload a Tour Plan workbook and TourPlan AI rebuilds it for any month — dates, weekdays, Sunday off-days and the monthly value rule, handled automatically." />
+
+<!-- ExcelJS: full OOXML-model engine. Reading + writing a workbook through
+     ExcelJS preserves every style property (fonts, fills, borders, merges,
+     alignments, row heights, column widths, hidden rows/cols, print
+     settings) that this app doesn't explicitly change. -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Ambient animated background -->
+<div class="bg-field" aria-hidden="true">
+  <div class="bg-grid"></div>
+  <div class="bg-orb bg-orb--blue"></div>
+  <div class="bg-orb bg-orb--purple"></div>
+  <div class="bg-orb bg-orb--cyan"></div>
+</div>
+
+<div class="page">
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <div class="hero__eyebrow">
+      <span class="dot dot--pulse"></span>
+      Workbook Intelligence
+    </div>
+    <h1 class="hero__title">
+      Your Tour Plan,<br />
+      <span class="hero__title-accent">rebuilt for next month.</span>
+    </h1>
+    <p class="hero__sub">
+      Upload the workbook you already use. TourPlan AI reads its structure, regenerates every date and weekday,
+      applies the Sunday off-day rule, and rebalances the month to a clean ₹2,50,000 — without touching your layout.
+    </p>
+  </header>
+
+  <!-- ============ MAIN CARD ============ -->
+  <main class="console" id="console">
+
+    <!-- STEP 1 — Upload -->
+    <section class="panel panel--glass" id="panel-upload">
+      <div class="panel__head">
+        <span class="panel__index">01</span>
+        <h2>Upload workbook</h2>
+      </div>
+
+      <label class="dropzone" id="dropzone" for="fileInput" tabindex="0">
+        <input type="file" id="fileInput" accept=".xlsx" hidden />
+        <div class="dropzone__icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M24 6v24m0-24 9 9m-9-9-9 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 30v6a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4v-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="dropzone__title">Drop your .xlsx here</p>
+        <p class="dropzone__sub">or tap to browse — Tour Plan / PJP workbooks only</p>
+      </label>
+
+      <div class="file-chip" id="fileChip" hidden>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="2" width="16" height="20" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span class="file-chip__name" id="fileChipName">—</span>
+        <button class="file-chip__remove" id="fileChipRemove" type="button" aria-label="Remove file">✕</button>
+      </div>
+
+      <p class="inline-message" id="uploadMessage" role="status" hidden></p>
+
+      <div class="detected-grid" id="detectedGrid" hidden>
+        <div class="detected-item"><span class="detected-item__label">Detected name</span><span class="detected-item__value" id="detName">—</span></div>
+        <div class="detected-item"><span class="detected-item__label">Source month</span><span class="detected-item__value" id="detMonth">—</span></div>
+        <div class="detected-item"><span class="detected-item__label">Template rows</span><span class="detected-item__value" id="detRows">—</span></div>
+        <div class="detected-item"><span class="detected-item__label">Working-day entries</span><span class="detected-item__value" id="detEntries">—</span></div>
+      </div>
+    </section>
+
+    <!-- STEP 2 — Target period -->
+    <section class="panel panel--glass" id="panel-period">
+      <div class="panel__head">
+        <span class="panel__index">02</span>
+        <h2>Choose the target period</h2>
+      </div>
+
+      <div class="period-row">
+        <div class="field">
+          <label for="monthSelect">Month</label>
+          <select id="monthSelect"></select>
+        </div>
+        <div class="field">
+          <label for="yearSelect">Year</label>
+          <select id="yearSelect"></select>
+        </div>
+      </div>
+
+      <button class="btn btn--primary" id="generateBtn" type="button" disabled>
+        <span class="btn__label">Generate Tour Plan</span>
+        <svg class="btn__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12h14m0 0-6-6m6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </section>
+
+    <!-- STEP 3 — AI status panel -->
+    <section class="panel panel--glass panel--console" id="panel-status" hidden>
+      <div class="panel__head">
+        <span class="panel__index">03</span>
+        <h2>Generating</h2>
+        <span class="status-pill" id="statusPill">Working</span>
+      </div>
+
+      <div class="terminal" id="terminal" role="log" aria-live="polite"></div>
+
+      <div class="scan-grid" id="scanGrid" aria-hidden="true"></div>
+    </section>
+
+    <!-- STEP 4 — Result -->
+    <section class="panel panel--glass panel--result" id="panel-result" hidden>
+      <div class="panel__head">
+        <span class="panel__index">04</span>
+        <h2>Your workbook is ready</h2>
+      </div>
+
+      <div class="result-grid">
+        <div class="result-stat">
+          <span class="result-stat__label">Month generated</span>
+          <span class="result-stat__value" id="resMonth">—</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat__label">Working days</span>
+          <span class="result-stat__value" id="resWorking">—</span>
+        </div>
+        <div class="result-stat">
+          <span class="result-stat__label">Sundays cleared</span>
+          <span class="result-stat__value" id="resSundays">—</span>
+        </div>
+        <div class="result-stat result-stat--accent">
+          <span class="result-stat__label">Monthly VALUE total</span>
+          <span class="result-stat__value" id="resTotal">—</span>
+        </div>
+      </div>
+
+      <p class="inline-message inline-message--warn" id="resWarning" hidden></p>
+
+      <button class="btn btn--primary" id="downloadBtn" type="button">
+        <span class="btn__label">Download workbook</span>
+        <svg class="btn__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="btn btn--ghost" id="resetBtn" type="button">Start another</button>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Runs entirely in your browser. Your workbook is never uploaded anywhere — it's parsed and rewritten on this device.</p>
+  </footer>
+
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
