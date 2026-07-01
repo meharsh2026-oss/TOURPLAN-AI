@@ -681,9 +681,9 @@ button:hover {
 }
 @keyframes fadeIn {
 from { opacity: 0; }
-to { opacity: 1; }
+to { opacity: 0; }
 }
 
 body {
-animation: fadeIn 0.4s ease;
+animation: fadeIn 0.0s ease;
 }
